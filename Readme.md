@@ -11,15 +11,18 @@
 ```
 vue-nest-k8s
 ├── backend            # NestJS 백엔드
-├── frontend           # Vue 프론트엔드
-├── k8s                # Kubernetes 설정 파일
+│   ├── src/          # 소스 코드
+│   ├── Dockerfile    # 백엔드 도커 이미지 설정
+│   └── .env          # 환경 변수 설정
+├── frontend          # Vue 프론트엔드
+│   ├── src/         # 소스 코드
+│   └── Dockerfile   # 프론트엔드 도커 이미지 설정
+├── k8s               # Kubernetes 설정 파일
 │   ├── backend-deployment.yaml
 │   ├── frontend-deployment.yaml
 │   ├── postgres-deployment.yaml
-│   ├── backend-service.yaml
-│   ├── frontend-service.yaml
-│   ├── postgres-service.yaml
-├── setup.sh           # Minikube 실행 및 배포 스크립트
+│   └── postgres-secret.yml
+├── setup.sh          # Minikube 실행 및 배포 스크립트
 └── README.md
 ```
 
@@ -44,7 +47,7 @@ open -a Docker
 Docker가 실행된 후, Minikube를 시작합니다.
 
 ```bash
-minikube start --driver=docker
+minikube start --driver=docker --cpus=2 --memory=4096
 ```
 
 ---
@@ -60,59 +63,39 @@ chmod +x setup.sh  # 실행 권한 부여
 
 이 스크립트는 다음 작업을 수행합니다.
 
+- 기존 배포된 리소스 삭제
 - Minikube 시작
-- Docker 환경 설정
-- 백엔드 및 프론트엔드 Docker 이미지 빌드
+- Docker 이미지 빌드 (프론트엔드, 백엔드, PostgreSQL)
 - Kubernetes 배포
-- 서비스 URL 출력
+- 서비스 상태 확인
 
 ---
 
-## 4. 개별 실행 방법 (수동 배포)
+## 4. 접속 방법
 
-### 4.1 Docker 이미지 빌드
+### 4.1 프론트엔드 접속
 
-```bash
-eval $(minikube docker-env)  # Minikube 내부에서 로컬 빌드 활성화
-docker build -t backend-image:latest ./backend
-docker build -t frontend-image:latest ./frontend
+프론트엔드는 다음 URL로 접속할 수 있습니다:
+
+```
+http://localhost:30000
 ```
 
-### 4.2 Kubernetes 배포
+### 4.2 백엔드 API 접속
 
-```bash
-kubectl apply -f k8s/postgres-deployment.yaml
-kubectl apply -f k8s/backend-deployment.yaml
-kubectl apply -f k8s/frontend-deployment.yaml
+백엔드 API는 다음 URL로 접속할 수 있습니다:
+
+```
+http://localhost:30001
 ```
 
----
-
-## 5. 접속 방법
-
-### 5.1 프론트엔드 접속
-
-```bash
-minikube service frontend --url
-```
-
-출력된 URL을 브라우저에서 열어 Vue 애플리케이션을 확인합니다.
-
-### 5.2 백엔드 (NestJS) API 확인
-
-```bash
-minikube service backend --url
-```
-
-출력된 URL을 Postman 또는 브라우저에서 호출하여 API 응답을 확인합니다.
-
-### 5.3 PostgreSQL 접속
+### 4.3 PostgreSQL 접속
 
 PostgreSQL Pod 이름을 확인한 후, 내부에서 데이터베이스에 접속합니다.
 
 ```bash
 kubectl get pods  # PostgreSQL Pod 이름 확인
-kubectl exec -it postgres-xxxxx-yyyyy -- psql -U postgres -d nestjs
+kubectl exec -it postgres-xxxxx-yyyyy -- psql -U postgres -d postgres
 ```
 
 또는 로컬에서 PostgreSQL에 접속하려면 포트 포워딩을 설정합니다.
@@ -126,109 +109,66 @@ kubectl port-forward deployment/postgres 5432:5432
 - **Host**: `localhost`
 - **Port**: `5432`
 - **Username**: `postgres`
-- **Password**: `password`
-- **Database**: `nestjs`
+- **Password**: `postgres`
+- **Database**: `postgres`
 
 ---
 
-## 6. Minikube 실행 오류 해결 방법 (Mac M1/M2)
+## 5. 환경 변수 설정
 
-Minikube 실행 시 `Cannot connect to the Docker daemon` 및 `connect: connection refused` 오류가 발생하는 경우, 아래 해결 방법을 순서대로 시도해보세요.
+### 5.1 백엔드 환경 변수
 
-### **6.1 Docker 데몬이 실행 중인지 확인**
+백엔드의 `.env` 파일에 다음 환경 변수들이 설정되어 있습니다:
 
-```bash
-docker info
 ```
-
-만약 실행 중이 아니라면, Docker를 실행합니다.
-
-```bash
-open -a Docker
-```
-
-완전히 실행될 때까지 기다린 후 다시 Minikube를 시작해보세요.
-
-```bash
-minikube delete
-minikube start --driver=docker
-```
-
-### **6.2 Minikube 드라이버 변경**
-
-Mac M1/M2에서는 `docker` 드라이버 대신 `hyperkit` 또는 `virtualbox` 드라이버를 사용할 수 있습니다.
-
-#### **Hyperkit 드라이버 사용**
-
-```bash
-brew install hyperkit
-minikube start --driver=hyperkit
-```
-
-#### **VirtualBox 드라이버 사용**
-
-```bash
-brew install --cask virtualbox
-minikube start --driver=virtualbox
-```
-
-### **6.3 Minikube 환경 초기화 후 다시 실행**
-
-```bash
-minikube stop
-minikube delete
-rm -rf ~/.minikube
-rm -rf ~/.kube
-minikube start --driver=docker
-```
-
-### **6.4 Minikube와 Kubernetes 버전 확인**
-
-```bash
-minikube version
-kubectl version --client
-```
-
-최신 버전으로 업데이트 후 다시 실행해보세요.
-
-```bash
-brew upgrade minikube
-brew upgrade kubectl
-minikube delete
-minikube start --driver=docker
-```
-
-### **6.5 Minikube 강제 재설정**
-
-```bash
-minikube stop
-minikube delete
-rm -rf ~/.minikube
-minikube start --force --driver=docker
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=postgres
+CORS_ORIGIN=http://localhost:30000
+API_URL=http://localhost:30001
 ```
 
 ---
 
-### **7. 최종 실행 확인**
+## 6. 문제 해결
 
-위 단계를 수행한 후 다시 `setup.sh` 실행:
+### 6.1 서비스 상태 확인
 
 ```bash
-chmod +x setup.sh
+kubectl get pods
+kubectl get services
+```
+
+### 6.2 로그 확인
+
+```bash
+# 백엔드 로그
+kubectl logs deployment/backend
+
+# 프론트엔드 로그
+kubectl logs deployment/frontend
+
+# PostgreSQL 로그
+kubectl logs deployment/postgres
+```
+
+### 6.3 재배포
+
+문제가 발생한 경우 다음 명령어로 재배포할 수 있습니다:
+
+```bash
 ./setup.sh
 ```
 
-그리고 Minikube 상태를 확인합니다.
+---
 
-```bash
-minikube status
-```
+## 7. 개발 환경
 
-정상적으로 실행되었다면 서비스 URL을 확인하세요.
-
-```bash
-minikube service frontend --url
-minikube service backend --url
-```
-
-이제 Vue + NestJS + PostgreSQL 프로젝트를 Kubernetes 환경에서 실행하고 관리할 수 있습니다! 🚀
+- Node.js: v20
+- Vue.js: 최신 버전
+- NestJS: 최신 버전
+- PostgreSQL: 13
+- Kubernetes: Minikube
+- Docker: 최신 버전
