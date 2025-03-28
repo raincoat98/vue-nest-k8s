@@ -21,7 +21,8 @@ vue-nest-k8s
 │   ├── backend-deployment.yaml
 │   ├── frontend-deployment.yaml
 │   ├── postgres-deployment.yaml
-│   └── postgres-secret.yml
+│   ├── postgres-secret.yml
+│   └── ingress-resource.yaml
 ├── setup.sh          # Minikube 실행 및 배포 스크립트
 └── README.md
 ```
@@ -44,10 +45,11 @@ docker info
 open -a Docker
 ```
 
-Docker가 실행된 후, Minikube를 시작합니다.
+Docker가 실행된 후, Minikube를 시작하고 Ingress 애드온을 활성화합니다.
 
 ```bash
 minikube start --driver=docker --cpus=2 --memory=4096
+minikube addons enable ingress
 ```
 
 ---
@@ -68,24 +70,43 @@ chmod +x setup.sh  # 실행 권한 부여
 - Docker 이미지 빌드 (프론트엔드, 백엔드, PostgreSQL)
 - Kubernetes 배포
 - 서비스 상태 확인
+- Ingress IP 및 접속 URL 출력
 
 ---
 
 ## 4. 접속 방법
 
-### 4.1 프론트엔드 접속
+### 4.1 Ingress를 통한 접속
 
-프론트엔드는 다음 URL로 접속할 수 있습니다:
+Minikube IP를 사용하여 다음 URL로 접속할 수 있습니다:
+
+```bash
+# Minikube IP 확인
+minikube ip
+```
 
 ```
+# 프론트엔드 (예: http://192.168.49.2/)
+http://$(minikube ip)/
+
+# 백엔드 API (예: http://192.168.49.2/api)
+http://$(minikube ip)/api
+```
+
+### 4.2 직접 서비스 접속 (Ingress 비활성화 시)
+
+프론트엔드와 백엔드에 직접 접속할 수 있습니다:
+
+```bash
+# 포트 포워딩 설정
+kubectl port-forward service/frontend 30000:80
+kubectl port-forward service/backend 30001:3000
+
+# 접속 URL
+# 프론트엔드
 http://localhost:30000
-```
 
-### 4.2 백엔드 API 접속
-
-백엔드 API는 다음 URL로 접속할 수 있습니다:
-
-```
+# 백엔드 API
 http://localhost:30001
 ```
 
@@ -139,6 +160,7 @@ API_URL=http://localhost:30001
 ```bash
 kubectl get pods
 kubectl get services
+kubectl get ingress
 ```
 
 ### 6.2 로그 확인
@@ -152,6 +174,9 @@ kubectl logs deployment/frontend
 
 # PostgreSQL 로그
 kubectl logs deployment/postgres
+
+# Ingress 컨트롤러 로그
+kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
 ```
 
 ### 6.3 재배포
@@ -172,3 +197,4 @@ kubectl logs deployment/postgres
 - PostgreSQL: 13
 - Kubernetes: Minikube
 - Docker: 최신 버전
+- Ingress Controller: Nginx

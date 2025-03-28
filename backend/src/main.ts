@@ -15,6 +15,9 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // 전역 API prefix 설정
+  app.setGlobalPrefix('api');
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
